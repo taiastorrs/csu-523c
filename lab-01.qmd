@@ -1,6 +1,9 @@
 ---
 title: 'Lab 1: Data Science Tools'
 subtitle: 'Exploring Streamflow Across the Colorado River Basin'
+author:
+  - name: Taia Storrs
+    email: taia.storrs@colostate.edu
 format:
   html:
     code-fold: true
@@ -45,16 +48,6 @@ In this lab you will work with real streamflow records pulled directly from the 
 3. Open the project in RStudio (`File → Open Project`)
 4. Download this labs qmd file [here](lab-01.qmd) into your repo
 5. Add your information to the yaml
-
-```yaml
----
-...
-author:
-  - name: Your Name
-    email: your@colostate.edu
-...
----
-```
 
 ## Libraries
 
@@ -146,7 +139,13 @@ my.date <- as.Date("2023-09-30")
 **b.** Compute the **day-over-day change in discharge** for each gauge — how much flow rose or fell compared to the previous day. Store this as a new column called `flow_delta`. This tells you whether conditions are improving or deteriorating, which is often more actionable than the raw level alone.
 
 ```{r}
-
+raw <- raw |>
+  arrange(site_no, Date) |>
+  group_by(site_no) |>
+  mutate(
+    flow_delta = Flow - lag(Flow)
+  ) |>
+  ungroup()
 ```
 
 **c.** Filter to `my.date` and produce **two formatted tables** using `flextable`:
@@ -164,7 +163,50 @@ Hint: use `flextable()` with `set_header_labels()`, `set_caption()`, and `autofi
 :::
 
 ```{r}
+today <- raw |>
+  filter(Date == my.date)
+```
 
+```{r}
+table_highest <- today |>
+  slice_max(Flow, n = 5) |>
+  mutate(
+    Flow = round(Flow, 0),
+    flow_delta = round(flow_delta, 0)
+  ) |>
+  select(name, state, Flow, flow_delta) |>
+  flextable() |>
+  set_header_labels(
+    name = "Gauge",
+    state = "State",
+    Flow = "Discharge (cfs)",
+    flow_delta = "Day Change (cfs)"
+  ) |>
+  set_caption("Top 5 Gauges by Discharge on September 30, 2023") |>
+  autofit()
+
+table_highest
+```
+
+```{r}
+table_rising <- today |>
+  slice_max(flow_delta, n = 5) |>
+  mutate(
+    Flow = round(Flow, 0),
+    flow_delta = round(flow_delta, 0)
+  ) |>
+  select(name, state, Flow, flow_delta) |>
+  flextable() |>
+  set_header_labels(
+    name = "Gauge",
+    state = "State",
+    Flow = "Discharge (cfs)",
+    flow_delta = "Day Change (cfs)"
+  ) |>
+  set_caption("Top 5 Gauges with Largest Day-Over-Day Increase") |>
+  autofit()
+
+table_rising
 ```
 
 ---
