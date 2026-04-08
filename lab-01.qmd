@@ -1004,3 +1004,8 @@ Every tool — `dplyr`, `ggplot2`, `zoo`, `patchwork`, `broom`, `flextable` — 
 4. Submit your live URL to Canvas: `https://USERNAME.github.io/csu-523c/lab-01.html`
 
 Add this project to your personal website with a brief description — it counts toward end-of-semester extra credit.
+
+```{r}
+rmarkdown::render("lab-01.qmd", output_format = "html_document", output_dir = "docs")
+```
+
