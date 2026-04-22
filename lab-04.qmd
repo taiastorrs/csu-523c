@@ -363,7 +363,7 @@ kmeans_result <- kmeans(vals_clean, centers = k, iter.max = 100)
 
   - Create a new raster object by copying one of the original bands. For example:
   
-```{r, echo = TRUE, eval = FALSE}
+```{r, echo = TRUE}
 kmeans_raster <- landsat_crop[[1]]
 
 cluster_vals <- rep(NA, ncell(landsat_crop))
@@ -437,6 +437,7 @@ NDWI  0.7254
 MNDWI 1.2015
 WRI   0.9558
 SWI   0.7821
+KMeans 1.1808
  
 ```{r}
 # sum each layer 
@@ -511,8 +512,8 @@ Use `mapview` to generate a slippy map of the Palo, Iowa `bbox.` Find the locati
 > How many of the maps captured the flooding at that location? 
 
 ```{r}
-lon <- -91.790 
-lat <- 42.063 
+lon <- -91.790
+lat <- 42.064
 
 flood_point <- st_point(c(lon, lat)) |>        
   st_sfc(crs = 4326) |>                        
@@ -529,7 +530,7 @@ extracted <- terra::extract(flood_stack, vect(flood_point))
 print(extracted)
 ```
 
-1 map captured flooding at the coordinates -91.790, 42.063
+2 of the 6 maps captured flooding at this location (ID and NDVI)
 
 ****
 
