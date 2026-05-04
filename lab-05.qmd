@@ -13,6 +13,24 @@ author:
 
 In this lab, we will explore predictive modeling in hydrology using the `tidymodels` framework and the CAMELS (Catchment Attributes and Meteorology for Large-sample Studies) dataset.
 
+```{r}
+#| message: false
+library(tidyverse)
+library(tidymodels)
+library(powerjoin)
+library(glue)
+library(vip)
+library(baguette)
+library(ranger)      
+library(xgboost)     
+library(sf)          
+library(spatialsample) 
+library(skimr)       
+library(visdat)     
+library(patchwork)   
+```
+
+
 ## What is tidymodels?
 
 `tidymodels` is an R framework designed for machine learning and statistical modeling. Built on the principles of the `tidyverse`, `tidymodels` provides a consistent and modular approach to tasks like data preprocessing, model training, evaluation, and validation. By leveraging the strengths of packages such as `recipes`, `parsnip`, and `yardstick`, `tidymodels` streamlines the modeling workflow, making it easier to experiment with different models while maintaining reproducibility and interpretability.
@@ -43,6 +61,7 @@ The data we are going to download are the basin-level summaries. For example, if
 
 ```{r}
 #| message: false
+#| eval: false
 
 # Use the `findNLDI` function to get the basin and flowlines for the first gauge
 basin <- dataRetrieval::findNLDI(nwis = "01013500", 
@@ -83,16 +102,6 @@ The worked example below demonstrates (1) and a stripped-down (2). You'll apply 
 5. Connect it to a Github repository with `usethis::use_github()`
 
 Let's start by loading the necessary libraries for this lab (you may need to install some!):
-
-```{r}
-#| message: false
-library(tidyverse)
-library(tidymodels)
-library(powerjoin)
-library(glue)
-library(vip)
-library(baguette)
-```
 
 ## Data Download
 
@@ -249,14 +258,38 @@ scale_color_brewer(palette = "Set1") #uses a built-in color set.
 scale_color_gradient(low = "blue", high = "red") #makes small numbers blue and big numbers red.
 ```
 
-The zero_q_freq variable represents the frequency of days with Q = 0 mm/day, expressed as a percentage. It measures how often a basin's stream gauge records zero discharge. Values near 0% indicate perennial streams, while higher values indicate intermittent or ephemeral streams.
 :::
+
+The zero_q_freq variable represents the frequency of days with Q = 0 mm/day, expressed as a percentage. It measures how often a basin's stream gauge records zero discharge. Values near 0% indicate perennial streams, while higher values indicate intermittent or ephemeral streams.
 
 # Question 2: Your Turn (20 points)
 
 - [ ] Make 2 maps of the sites, coloring the points by the `aridity` and `p_mean` columns
 - [ ] Add clear labels, titles, and a color scale that makes sense for each parameter.
 - [ ] Ensure these render as a single image with your choice of `facet_*`, `patchwork`, or `ggpubr`
+
+```{r}
+library(patchwork)
+
+map_aridity <- ggplot(data = camels, aes(x = gauge_lon, y = gauge_lat)) +
+  borders("state", colour = "gray50") +
+  geom_point(aes(color = aridity)) +
+  scale_color_gradient(low = "darkgreen", high = "red") +
+  ggthemes::theme_map() +
+  labs(title = "Aridity Across CAMELS Basins",
+       color = "Aridity\n(PET/P)")
+
+map_pmean <- ggplot(data = camels, aes(x = gauge_lon, y = gauge_lat)) +
+  borders("state", colour = "gray50") +
+  geom_point(aes(color = p_mean)) +
+  scale_color_gradient(low = "lightyellow", high = "darkblue") +
+  ggthemes::theme_map() +
+  labs(title = "Mean Daily Precipitation Across CAMELS Basins",
+       color = "Precip\n(mm/day)")
+
+map_aridity / map_pmean
+```
+
 
 # Model Preparation
 
@@ -532,10 +565,6 @@ ggplot(lm_data, aes(x = logQmean, y = .pred, colour = aridity)) +
 
 The real power of this approach is that we can easily switch out the models/recipes and see how it performs. Here, we are going to instead use a random forest model to predict mean streamflow. We define a random forest model using the `rand_forest` function, set the engine to `ranger`, and the mode to `regression`. We then add the recipe, fit the model, and evaluate the skill.
 
-```{r}
-#| include: false
-install.packages("ranger")
-```
 
 
 ```{r}
@@ -738,7 +767,7 @@ ggplot(camels, aes(x = aridity)) +
   labs(title = "Distribution of Aridity") +
   theme_linedraw()
 
-ggplot(camels, aes(x = p_mean)) +s
+ggplot(camels, aes(x = p_mean))+
   geom_histogram(bins = 50, fill = "darkgreen") +
   labs(title = "Distribution of p_mean") +
   theme_linedraw()
@@ -819,17 +848,21 @@ With your preprocessing steps and models defined, build a `workflow_set` and com
  - [ ] Describe the gap (5–7 sentences): which model wins, how much does performance drop when you move from random to spatial CV, and which number do you trust as your generalization estimate? What does the spread of per-fold metrics tell you about *where* your model struggles? Recall from lecture that a **small** gap is a signal that your predictors carry real transferable signal — not a failed diagnostic.
 
 ```{r}
+library(sf)
+library(spatialsample)
+
 # Random 10-fold CV 
 camels_cv2 <- vfold_cv(camels_train2, v = 10)
 
 # Spatial CV 
-camels_sf <- st_as_sf(camels_train2, 
+camels_sf <- sf::st_as_sf(camels_train2, 
                       coords = c("gauge_lon", "gauge_lat"),
                       crs = 4326)
 
 # Spatial block CV
 camels_spatial_cv <- spatial_block_cv(camels_sf, v = 10)
 ```
+
 
 ```{r}
 # Build the workflow set
@@ -865,9 +898,6 @@ autoplot(wf_spatial) +
 rank_results(wf_spatial, rank_metric = "rsq", select_best = TRUE)
 ```
 
-```{r}
-rank_results(wf_random, rank_metric = "rsq", select_best = TRUE)
-```
 
 Under spatial cross-validation, the bagged neural network (bag_mlp) performed best with an R² of 0.900 and RMSE of 0.340, followed by random forest (R² = 0.881) and XGBoost (R² = 0.858). This ranking differed slightly from random CV where bag_mlp also led with R² = 0.937. All models showed a modest drop of 0.04-0.06 R² units when moving to spatial CV, suggesting our predictors carry genuine transferable hydrologic signal. XGBoost showed the largest drop (0.056), suggesting it may rely more on spatial proximity than the other models. I trust the spatial CV estimate as the honest generalization metric since CAMELS 
 basins span diverse climatic regions across the US.
