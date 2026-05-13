@@ -1,11 +1,11 @@
 ---
 title: 'Lab 6: Timeseries Data'
-format:
-   html:
-    toc: true
-    author:
+author:
   - name: Taia Storrs
     email: taia.storrs@colostate.edu
+format:
+  html:
+    toc: true
 ---
 
 # Introduction
